@@ -50,8 +50,24 @@ def login_required(f):
 
 @app.route('/')
 def index():
+    category = request.args.get('category')
+    books = BOOKS
+    if category:
+        books = [b for b in BOOKS if b.category.lower() == category.lower()]
     current_user = get_current_user()
-    return render_template('index.html', books=BOOKS, cart=cart, current_user=current_user)
+    return render_template(
+        'index.html',
+        books=books,
+        cart=cart,
+        current_user=current_user,
+        category=category
+    )
+@app.route('/books')
+def books_route():
+    # Support /books?category=Fiction while keeping one place for the logic
+    category = request.args.get('category')
+    return redirect(url_for('index', category=category))
+
 
 
 @app.route('/add-to-cart', methods=['POST'])
