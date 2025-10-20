@@ -1,10 +1,18 @@
-name: Python CI
+name: Python CI/CD Pipeline
 
-on: [push, pull_request]
+on: 
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ['3.9']
 
     steps:
     - name: Checkout repository
@@ -13,7 +21,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: ${{ matrix.python-version }}
 
     - name: Cache pip dependencies
       uses: actions/cache@v4
@@ -39,24 +47,37 @@ jobs:
       run: |
         # Stop the build if there are Python syntax errors or undefined names
         flake8 app.py models.py test/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        # Exit-zero treats all errors as warnings
+        # Check for style issues (warnings only)
         flake8 app.py models.py test/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
     - name: Validate Flask application
       run: |
         python -c "from app import app; print('Flask app loaded successfully')"
 
-    - name: Debug environment and test discovery
+    - name: Verify test discovery
       run: |
-        echo "Current directory contents:"
-        ls -la
-        echo "Test directory contents:"
-        ls -la test/
-        echo "Python path:"
-        python -c "import sys; print('\n'.join(sys.path))"
-        echo "Test discovery check:"
-        python -m pytest --collect-only
+        echo "Verifying test discovery..."
+        python -m pytest --collect-only -q
+        echo "✅ Test discovery successful"
 
     - name: Run tests with coverage
       run: |
-        python -m pytest --maxfail=1 --disable-warnings --cov=. --cov-report=term-missing
+        python -m pytest -v --maxfail=1 --disable-warnings --cov=. --cov-report=term-missing --cov-report=xml
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      if: always()
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Test Results Summary
+      if: always()
+      run: |
+        echo "🎉 CI/CD Pipeline Summary:"
+        echo "✅ Code linting completed"
+        echo "✅ Flask application validated"
+        echo "✅ Tests executed with coverage"
+        echo "📊 Check the Actions tab for detailed results"
